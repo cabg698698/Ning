@@ -43,8 +43,9 @@
 
       <div class="tool-bar" id="toolBar">
         <span class="tool-label">點日期就會：</span>
-        <button class="tool work active" data-tool="work">💼 一般上班</button>
+        <button class="tool work active" data-tool="work">💼 上班</button>
         <button class="tool duty" data-tool="duty">🌙 值班</button>
+        <button class="tool event" data-tool="event">📝 行程</button>
         <button class="tool clear" data-tool="clear">🧽 清除</button>
       </div>
 
@@ -89,18 +90,23 @@
     </section>
   </main>
 
-  <footer class="app-footer">
-    <details>
-      <summary>資料備份 / 換手機</summary>
-      <p>開了右上角的「雲端同步」就不用手動備份；這裡是額外留一份備份檔用的。</p>
-      <div class="backup-row">
-        <button class="chip" id="exportBtn">⬇️ 匯出備份</button>
-        <label class="chip file-chip">⬆️ 匯入備份<input type="file" id="importFile" accept="application/json" hidden /></label>
-      </div>
-    </details>
-  </footer>
-
   <div id="toast" class="toast"></div>
+
+  <!-- 某一天的行程 -->
+  <dialog id="dayDialog">
+    <h3 id="dayTitle"></h3>
+    <div id="dayShift" class="day-shift"></div>
+    <div id="dayEvents" class="day-events"></div>
+    <form id="eventForm" class="event-form" autocomplete="off">
+      <input id="eventTime" type="time" aria-label="時間（選填）" />
+      <input id="eventTitle" type="text" placeholder="輸入行程，例如：看牙醫" required />
+      <button type="submit" class="primary">加入</button>
+    </form>
+    <div class="dialog-actions">
+      <span class="spacer"></span>
+      <button type="button" class="ghost-btn" id="dayClose">完成</button>
+    </div>
+  </dialog>
 
   <!-- 雲端同步 -->
   <dialog id="syncDialog">

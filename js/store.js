@@ -11,7 +11,7 @@ const Store = (() => {
   const KEY_PREFS = 'ning.prefs.v1';
   const DEFAULT_REPO = 'cabg698698/ning-data';
   const FILE_PATH = 'data.json';
-  const POLL_MS = 30000;
+  const POLL_MS = 10000;
 
   const listeners = [];
   let state = loadState();
@@ -35,11 +35,12 @@ const Store = (() => {
     catch (e) { toast('⚠️ 儲存失敗，請確認瀏覽器沒有開無痕模式'); }
   }
 
-  function emptyState() { return { calendar: { 瓜甯: {}, 阿瓜: {} }, places: [] }; }
+  function emptyState() { return { calendar: { 瓜甯: {}, 阿瓜: {} }, events: { 瓜甯: {}, 阿瓜: {} }, places: [] }; }
 
   function normalize(s) {
     const out = emptyState();
     if (s && s.calendar) Object.assign(out.calendar, s.calendar);
+    if (s && s.events) Object.assign(out.events, s.events);
     if (s && Array.isArray(s.places)) out.places = s.places;
     return out;
   }
@@ -62,6 +63,21 @@ const Store = (() => {
       case 'cal': {
         const cal = s.calendar[op.person] || (s.calendar[op.person] = {});
         Object.entries(op.changes).forEach(([k, v]) => { if (v) cal[k] = v; else delete cal[k]; });
+        break;
+      }
+      case 'ev.put': {
+        const byDay = s.events[op.person] || (s.events[op.person] = {});
+        const list = byDay[op.date] || (byDay[op.date] = []);
+        const i = list.findIndex((e) => e.id === op.ev.id);
+        if (i >= 0) list[i] = op.ev; else list.push(op.ev);
+        break;
+      }
+      case 'ev.del': {
+        const byDay = s.events[op.person] || {};
+        if (byDay[op.date]) {
+          byDay[op.date] = byDay[op.date].filter((e) => e.id !== op.id);
+          if (!byDay[op.date].length) delete byDay[op.date];
+        }
         break;
       }
       case 'place.put': {
@@ -202,6 +218,12 @@ const Store = (() => {
       Object.entries(days).forEach(([k, v]) => { if (!r[k]) changes[k] = v; });
       if (Object.keys(changes).length) ops.push({ t: 'cal', person, changes });
     });
+    Object.entries(local.events || {}).forEach(([person, days]) => {
+      Object.entries(days).forEach(([date, list]) => {
+        const r = (((remote && remote.events) || {})[person] || {})[date] || [];
+        list.forEach((ev) => { if (!r.some((x) => x.id === ev.id)) ops.push({ t: 'ev.put', person, date, ev }); });
+      });
+    });
     const ids = new Set(((remote && remote.places) || []).map((p) => p.id));
     local.places.slice().reverse().forEach((p) => { if (!ids.has(p.id)) ops.push({ t: 'place.put', place: p }); });
     return ops;
@@ -278,21 +300,11 @@ const Store = (() => {
   function prefs() { return readJSON(KEY_PREFS, {}); }
   function setPrefs(patch) { writeJSON(KEY_PREFS, { ...prefs(), ...patch }); }
 
-  // ---------- 備份 ----------
-  function exportAll() {
-    return { app: 'ning', version: 2, exportedAt: new Date().toISOString(), ...state };
-  }
-  function importAll(data) {
-    if (!data || data.app !== 'ning') throw new Error('不是 Ning 的備份檔');
-    apply({ t: 'replace', state: data });
-    emit();
-  }
-
   return {
     get state() { return state; },
     apply, onChange, onStatus, start, sync, connect, disconnect, shareLink, consumeShareLink,
     get syncConfig() { return syncCfg; },
-    DEFAULT_REPO, prefs, setPrefs, exportAll, importAll,
+    DEFAULT_REPO, prefs, setPrefs,
   };
 })();
 
