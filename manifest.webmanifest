@@ -1,0 +1,11 @@
+{
+  "name": "Ning 我們的小本子",
+  "short_name": "Ning",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6efe6",
+  "theme_color": "#f6efe6",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
