@@ -55,17 +55,19 @@ const Calendar = (() => {
     const who = person === 'both' ? PEOPLE : [person];
     const list = who.flatMap((p) => evs(p, key).map((e) => ({ ...e, p })));
     if (!list.length) return '';
-    const shown = list.slice(0, 2).map((e) =>
+    const shown = list.slice(0, 3).map((e) =>
       `<span class="ev${person === 'both' ? ' who-' + PEOPLE.indexOf(e.p) : ''}">${e.time ? e.time + ' ' : ''}${escapeHtml(e.title)}</span>`).join('');
-    return shown + (list.length > 2 ? `<span class="ev-more">+${list.length - 2}</span>` : '');
+    return shown + (list.length > 3 ? `<span class="ev-more">+${list.length - 3}</span>` : '');
   }
 
-  // ---------- 某一天的行程視窗 ----------
+  // ---------- 某一天的行程視窗（先看，按「編輯」才能改）----------
+  let dayEditing = false;
+
   function openDay(key) {
     openDayKey = key;
+    dayEditing = false;
     renderDay();
     $('dayDialog').showModal();
-    if (person !== 'both') setTimeout(() => $('eventTitle').focus(), 50);
   }
 
   function renderDay() {
@@ -74,21 +76,46 @@ const Calendar = (() => {
     const [y, m, d] = key.split('-').map(Number);
     const dow = WEEKDAYS[new Date(y, m - 1, d).getDay()];
     const both = person === 'both';
-    $('dayTitle').textContent = `${m}/${d}（${dow}）${both ? '兩人的行程' : person + '的行程'}`;
+    const editing = dayEditing && !both;
+    $('dayTitle').textContent = `${m}/${d}（${dow}）${both ? '兩人的行程' : person + '的行程'}${editing ? '・編輯中' : ''}`;
     const who = both ? PEOPLE : [person];
     $('dayShift').innerHTML = who.map((p) => {
       const t = cal(p)[key];
-      return `${both ? p + '：' : ''}${t ? TYPES[t].icon + ' ' + TYPES[t].label : '沒排班'}`;
-    }).join('　');
+      return `<span>${both ? p + '：' : ''}${t ? TYPES[t].icon + ' ' + TYPES[t].label : '沒排班'}</span>`;
+    }).join('');
     const list = who.flatMap((p) => evs(p, key).map((e) => ({ ...e, p })));
-    $('dayEvents').innerHTML = list.length ? list.map((e) => `
-      <div class="day-ev">
-        ${both ? `<span class="w who-${PEOPLE.indexOf(e.p)}">${e.p === '瓜甯' ? '甯' : '瓜'}</span>` : ''}
-        <span class="t">${e.time || '整天'}</span>
-        <span class="n">${escapeHtml(e.title)}</span>
-        ${both ? '' : `<button type="button" data-del="${e.id}" aria-label="刪除">✕</button>`}
-      </div>`).join('') : '<p class="muted">這天還沒有行程</p>';
-    $('eventForm').classList.toggle('hidden', both);
+
+    if (editing) {
+      $('dayEvents').innerHTML = list.map((e) => `
+        <div class="edit-ev" data-id="${e.id}">
+          <input class="ee-title" type="text" value="${escapeHtml(e.title)}" aria-label="行程內容" />
+          <div class="time-row">
+            <label class="allday"><input type="checkbox" class="ee-allday"${e.time ? '' : ' checked'} /> 整天</label>
+            <input class="ee-time${e.time ? '' : ' hidden'}" type="time" value="${e.time || ''}" aria-label="時間" />
+            <span class="spacer"></span>
+            <button type="button" class="del-btn" data-del="${e.id}">🗑️ 刪除</button>
+          </div>
+        </div>`).join('');
+    } else {
+      $('dayEvents').innerHTML = list.length ? list.map((e) => `
+        <div class="day-ev">
+          ${both ? `<span class="w who-${PEOPLE.indexOf(e.p)}">${e.p === '瓜甯' ? '甯' : '瓜'}</span>` : ''}
+          ${e.time ? `<span class="t">${e.time}</span>` : ''}
+          <span class="n">${escapeHtml(e.title)}</span>
+        </div>`).join('') : '<p class="muted">這天還沒有行程</p>';
+    }
+    $('eventForm').classList.toggle('hidden', !editing);
+    $('dayEdit').classList.toggle('hidden', both || editing);
+    $('dayClose').textContent = editing ? '完成編輯' : '關閉';
+  }
+
+  function saveEditRow(row) {
+    const title = row.querySelector('.ee-title').value.trim();
+    if (!title) return;
+    const allDay = row.querySelector('.ee-allday').checked;
+    const time = allDay ? '' : row.querySelector('.ee-time').value;
+    Store.apply({ t: 'ev.put', person, date: openDayKey, ev: { id: row.dataset.id, title, time } });
+    render();
   }
 
   function render() {
@@ -146,7 +173,7 @@ const Calendar = (() => {
       : tool === 'event'
         ? '點日期就能新增或查看那天的行程。'
         : '選好上方的「一般上班 / 值班」，再點日期就能一鍵加上；再點一次同一天可取消。要寫行程請選「📝 行程」。';
-    if ($('dayDialog').open) renderDay();
+    if ($('dayDialog').open && !dayEditing) renderDay(); // 編輯中不重畫，避免打字打到一半被打斷
   }
 
   function init() {
@@ -154,25 +181,68 @@ const Calendar = (() => {
       const btn = e.target.closest('.day[data-key]');
       if (btn) onDayTap(btn.dataset.key);
     });
+    $('newAllDay').addEventListener('change', (e) => {
+      $('eventTime').classList.toggle('hidden', e.target.checked);
+      if (!e.target.checked) $('eventTime').focus();
+    });
     $('eventForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const title = $('eventTitle').value.trim();
       if (!title || !openDayKey || person === 'both') return;
-      const ev = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), time: $('eventTime').value || '', title };
+      const time = $('newAllDay').checked ? '' : $('eventTime').value;
+      const ev = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), time, title };
       Store.apply({ t: 'ev.put', person, date: openDayKey, ev });
       $('eventTitle').value = '';
       $('eventTime').value = '';
+      $('newAllDay').checked = true;
+      $('eventTime').classList.add('hidden');
       render();
-      $('eventTitle').focus();
+      renderDay();
+      toast('已加入行程');
+    });
+    $('dayEvents').addEventListener('change', (e) => {
+      const row = e.target.closest('.edit-ev');
+      if (!row) return;
+      if (e.target.classList.contains('ee-allday')) {
+        const t = row.querySelector('.ee-time');
+        t.classList.toggle('hidden', e.target.checked);
+        if (e.target.checked) t.value = '';
+        else { t.focus(); return; } // 等選好時間再存
+      }
+      saveEditRow(row);
     });
     $('dayEvents').addEventListener('click', (e) => {
       const b = e.target.closest('[data-del]');
       if (!b || person === 'both') return;
+      const row = b.closest('.edit-ev');
+      const name = row ? row.querySelector('.ee-title').value : '';
+      if (!confirm(`刪除「${name}」？`)) return;
       Store.apply({ t: 'ev.del', person, date: openDayKey, id: b.dataset.del });
       render();
+      renderDay();
     });
-    $('dayClose').addEventListener('click', () => $('dayDialog').close());
-    $('dayDialog').addEventListener('close', () => { openDayKey = null; });
+    $('dayEdit').addEventListener('click', () => {
+      dayEditing = true;
+      renderDay();
+      if (!evs(person, openDayKey).length) $('eventTitle').focus();
+    });
+    $('dayClose').addEventListener('click', () => {
+      if (dayEditing) {
+        // 把還在輸入框裡、沒觸發 change 的修改也存起來
+        document.querySelectorAll('#dayEvents .edit-ev').forEach((row) => {
+          const id = row.dataset.id;
+          const cur = evs(person, openDayKey).find((x) => x.id === id);
+          const title = row.querySelector('.ee-title').value.trim();
+          if (cur && title && title !== cur.title) saveEditRow(row);
+        });
+        if ($('eventTitle').value.trim()) $('eventForm').requestSubmit();
+        dayEditing = false;
+        renderDay();
+        return;
+      }
+      $('dayDialog').close();
+    });
+    $('dayDialog').addEventListener('close', () => { openDayKey = null; dayEditing = false; });
     $('personSwitch').addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;

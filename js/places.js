@@ -8,8 +8,8 @@ const Places = (() => {
   ];
   const UNKNOWN = '未分類';
   const CAT = {
-    food: { label: '美食', icon: '🍜', color: '#e07a3f' },
-    spot: { label: '景點', icon: '🏞️', color: '#3f8f6b' },
+    food: { label: '美食', icon: '🍜', color: '#ff6fae' },
+    spot: { label: '景點', icon: '🏞️', color: '#b58cff' },
   };
 
   // ---------- 自動分類 ----------
