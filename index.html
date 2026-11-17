@@ -15,7 +15,10 @@
 </head>
 <body>
   <header class="app-header">
-    <h1>Ning <span>我們的小本子</span></h1>
+    <div class="title-row">
+      <h1>Ning <span>我們的小本子</span></h1>
+      <button class="sync-btn" id="syncBtn" aria-label="雲端同步設定"><span class="dot"></span><span id="syncText">未同步</span></button>
+    </div>
     <nav class="tabs" role="tablist">
       <button class="tab active" data-view="calendar" role="tab">📅 行事曆</button>
       <button class="tab" data-view="places" role="tab">📍 想去的地方</button>
@@ -89,7 +92,7 @@
   <footer class="app-footer">
     <details>
       <summary>資料備份 / 換手機</summary>
-      <p>資料存在這台裝置的瀏覽器裡，關掉也不會消失。換手機或要同步給對方時，可以先匯出再匯入。</p>
+      <p>開了右上角的「雲端同步」就不用手動備份；這裡是額外留一份備份檔用的。</p>
       <div class="backup-row">
         <button class="chip" id="exportBtn">⬇️ 匯出備份</button>
         <label class="chip file-chip">⬆️ 匯入備份<input type="file" id="importFile" accept="application/json" hidden /></label>
@@ -98,6 +101,37 @@
   </footer>
 
   <div id="toast" class="toast"></div>
+
+  <!-- 雲端同步 -->
+  <dialog id="syncDialog">
+    <div id="syncSetup">
+      <h3>☁️ 雲端同步（存到你的 GitHub）</h3>
+      <p class="muted">資料會存在你的<b>私人</b> GitHub repo 裡，手機、電腦、阿瓜的手機都看同一份。</p>
+      <label>GitHub 權杖（Token）<input id="syncToken" type="password" placeholder="github_pat_…" autocomplete="off" /></label>
+      <label>資料 repo<input id="syncRepo" type="text" autocomplete="off" /></label>
+      <p class="muted small-note">權杖只存在這台裝置。請用只開放「ning-data」一個 repo 的 fine-grained token。</p>
+      <div class="dialog-actions">
+        <span class="spacer"></span>
+        <button type="button" class="ghost-btn" data-close>取消</button>
+        <button type="button" class="primary" id="syncConnect">連線</button>
+      </div>
+    </div>
+    <div id="syncConnected" class="hidden">
+      <h3>☁️ 雲端同步中</h3>
+      <p>資料 repo：<b id="syncRepoLabel"></b></p>
+      <p class="muted" id="syncStatusLabel"></p>
+      <div class="sync-actions">
+        <button type="button" class="chip" id="syncNow">🔄 立即同步</button>
+        <button type="button" class="chip" id="syncShare">🔗 複製設定連結（給另一台裝置）</button>
+      </div>
+      <p class="muted small-note">在另一台裝置（電腦、阿瓜的手機）打開設定連結，就會自動連上，不用再輸入權杖。連結裡有權杖，只傳給自己人喔。</p>
+      <div class="dialog-actions">
+        <button type="button" class="danger" id="syncOff">中斷同步</button>
+        <span class="spacer"></span>
+        <button type="button" class="primary" data-close>好</button>
+      </div>
+    </div>
+  </dialog>
 
   <!-- 編輯地點 -->
   <dialog id="placeDialog">

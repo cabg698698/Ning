@@ -81,7 +81,7 @@ const Places = (() => {
   }
 
   // ---------- 資料 ----------
-  let places = Store.load('places', []);
+  const all = () => Store.state.places;
   let catFilter = 'all';
   let countyFilter = 'all';
   let showVisited = false;
@@ -90,7 +90,7 @@ const Places = (() => {
   let editingId = null;
 
   const $ = (id) => document.getElementById(id);
-  const persist = () => Store.save('places', places);
+  const put = (place) => Store.apply({ t: 'place.put', place: { ...place, updatedAt: Date.now() } });
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
   function navUrl(p) {
@@ -237,11 +237,10 @@ const Places = (() => {
       p = { ...lastCandidates[+btn.dataset.i] };
       delete p.sub;
     }
-    const dup = places.find((x) => x.name === p.name && !x.visited);
+    const dup = all().find((x) => x.name === p.name && !x.visited);
     if (dup && !confirm(`「${p.name}」已經在清單裡了，還要再加一次嗎？`)) return;
     const place = { id: uid(), ...p, note: '', visited: false, createdAt: Date.now() };
-    places.unshift(place);
-    persist();
+    put(place);
     closeResults();
     $('placeQuery').value = '';
     $('placeHint').value = '';
@@ -299,7 +298,7 @@ const Places = (() => {
   }
 
   function focusPlace(id) {
-    const p = places.find((x) => x.id === id);
+    const p = all().find((x) => x.id === id);
     const mk = markers.get(id);
     if (!p || !mk || !map) return;
     map.setView([p.lat, p.lng], Math.max(map.getZoom(), 14));
@@ -309,14 +308,14 @@ const Places = (() => {
 
   // ---------- 清單 ----------
   function filtered() {
-    return places.filter((p) =>
+    return all().filter((p) =>
       (showVisited || !p.visited) &&
       (catFilter === 'all' || p.category === catFilter) &&
       (countyFilter === 'all' || p.county === countyFilter));
   }
 
   function renderCountyOptions() {
-    const base = places.filter((p) => (showVisited || !p.visited) && (catFilter === 'all' || p.category === catFilter));
+    const base = all().filter((p) => (showVisited || !p.visited) && (catFilter === 'all' || p.category === catFilter));
     const counts = {};
     base.forEach((p) => { counts[p.county] = (counts[p.county] || 0) + 1; });
     const order = [...COUNTIES, UNKNOWN].filter((c) => counts[c]);
@@ -333,7 +332,7 @@ const Places = (() => {
     const list = filtered();
     renderMap(list);
 
-    if (!places.length) {
+    if (!all().length) {
       $('placeList').innerHTML = '<div class="empty-state">還沒有想去的地方 🌱<br>在上面輸入店名或景點，按「搜尋」就能加入！</div>';
       return;
     }
@@ -374,8 +373,9 @@ const Places = (() => {
     const el = e.target.closest('[data-act]');
     if (!el) return;
     const id = el.closest('.place').dataset.id;
-    const p = places.find((x) => x.id === id);
-    if (!p) return;
+    const found = all().find((x) => x.id === id);
+    if (!found) return;
+    const p = { ...found };
     switch (el.dataset.act) {
       case 'focus':
         if (p.lat == null) toast('這個地點沒有座標，按「導航」交給 Google 找');
@@ -383,12 +383,12 @@ const Places = (() => {
         break;
       case 'toggleCat':
         p.category = p.category === 'food' ? 'spot' : 'food';
-        persist(); render();
+        put(p); render();
         break;
       case 'visited':
         p.visited = !p.visited;
         p.visitedAt = p.visited ? Date.now() : null;
-        persist(); render();
+        put(p); render();
         toast(p.visited ? `🎉 ${p.name} 打卡完成！` : `${p.name} 改回想去`);
         break;
       case 'edit':
@@ -410,18 +410,19 @@ const Places = (() => {
 
   function onEditClose() {
     const action = $('placeDialog').returnValue;
-    const p = places.find((x) => x.id === editingId);
-    if (!p) return;
+    const found = all().find((x) => x.id === editingId);
+    if (!found) return;
+    const p = { ...found };
     if (action === 'save') {
       p.name = $('editName').value.trim() || p.name;
       p.category = $('editCat').value;
       p.county = $('editCounty').value;
       p.note = $('editNote').value.trim();
-      persist(); render();
+      put(p); render();
     } else if (action === 'delete') {
       if (confirm(`確定刪除「${p.name}」？`)) {
-        places = places.filter((x) => x.id !== p.id);
-        persist(); render();
+        Store.apply({ t: 'place.del', id: p.id });
+        render();
       }
     }
     editingId = null;
@@ -449,8 +450,7 @@ const Places = (() => {
   }
 
   function reload() {
-    places = Store.load('places', []);
-    if (map) render();
+    if (document.getElementById('view-places').classList.contains('active')) render();
   }
 
   return { init, onShow, reload, classify, countyFromText, countyFromAddress, parseGoogleUrl };

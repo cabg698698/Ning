@@ -7,11 +7,10 @@ const Calendar = (() => {
   };
   const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
-  // data = { '瓜甯': { '2026-11-17': 'work' }, '阿瓜': { ... } }
-  let data = Store.load('calendar', {});
-  PEOPLE.forEach((p) => { if (!data[p]) data[p] = {}; });
+  // Store.state.calendar = { '瓜甯': { '2026-11-17': 'work' }, '阿瓜': { ... } }
+  const cal = (p) => Store.state.calendar[p] || {};
 
-  const prefs = Store.load('prefs', {});
+  const prefs = Store.prefs();
   let person = PEOPLE.includes(prefs.person) || prefs.person === 'both' ? prefs.person : PEOPLE[0];
   let tool = ['work', 'duty', 'clear'].includes(prefs.tool) ? prefs.tool : 'work';
   let cursor = new Date();
@@ -25,31 +24,21 @@ const Calendar = (() => {
     return `${d.getFullYear()}-${m}-${day}`;
   }
 
-  function savePrefs() {
-    const p = Store.load('prefs', {});
-    p.person = person;
-    p.tool = tool;
-    Store.save('prefs', p);
-  }
+  function savePrefs() { Store.setPrefs({ person, tool }); }
 
-  function persist() { Store.save('calendar', data); }
-
-  function setDay(who, key, type) {
-    if (type === 'clear' || !type) delete data[who][key];
-    else data[who][key] = type;
-  }
+  function setDays(who, changes) { Store.apply({ t: 'cal', person: who, changes }); }
 
   function onDayTap(key) {
     if (person === 'both') {
       toast('要編輯請先切到「瓜甯」或「阿瓜」');
       return;
     }
-    const current = data[person][key];
+    const current = cal(person)[key];
     let next;
-    if (tool === 'clear') next = 'clear';
-    else next = current === tool ? 'clear' : tool; // 再點一次同類型 = 取消
-    setDay(person, key, next);
-    persist();
+    if (tool === 'clear') next = null;
+    else next = current === tool ? null : tool; // 再點一次同類型 = 取消
+    if ((current || null) === next) return;
+    setDays(person, { [key]: next });
     render();
     if (navigator.vibrate) navigator.vibrate(10);
   }
@@ -80,10 +69,10 @@ const Calendar = (() => {
       let badges = '';
       let cls = 'day';
       if (person === 'both') {
-        badges = PEOPLE.map((p) => badge(data[p][key], p)).join('');
-        if (PEOPLE.every((p) => !data[p][key])) cls += ' both-off';
+        badges = PEOPLE.map((p) => badge(cal(p)[key], p)).join('');
+        if (PEOPLE.every((p) => !cal(p)[key])) cls += ' both-off';
       } else {
-        const type = data[person][key];
+        const type = cal(person)[key];
         badges = badge(type);
         if (type) cls += ` is-${type}`;
       }
@@ -98,7 +87,7 @@ const Calendar = (() => {
     const prefix = `${y}-${String(m + 1).padStart(2, '0')}-`;
     const shown = person === 'both' ? PEOPLE : [person];
     $('monthStats').innerHTML = shown.map((p) => {
-      const days = Object.entries(data[p]).filter(([k]) => k.startsWith(prefix));
+      const days = Object.entries(cal(p)).filter(([k]) => k.startsWith(prefix));
       const work = days.filter(([, t]) => t === 'work').length;
       const duty = days.filter(([, t]) => t === 'duty').length;
       return `<div class="stat"><strong>${p}</strong> 上班 <b>${work}</b> 天 ・ 值班 <b>${duty}</b> 天</div>`;
@@ -143,22 +132,24 @@ const Calendar = (() => {
       const y = cursor.getFullYear();
       const m = cursor.getMonth();
       const n = new Date(y, m + 1, 0).getDate();
-      let count = 0;
+      const changes = {};
       for (let d = 1; d <= n; d++) {
         const date = new Date(y, m, d);
         const dow = date.getDay();
         const key = ymd(date);
-        if (dow !== 0 && dow !== 6 && !data[person][key]) { data[person][key] = 'work'; count++; }
+        if (dow !== 0 && dow !== 6 && !cal(person)[key]) changes[key] = 'work';
       }
-      persist();
+      const count = Object.keys(changes).length;
+      if (count) setDays(person, changes);
       render();
       toast(`已幫${person}加上 ${count} 天上班（已排值班的日子不會被蓋掉）`);
     };
     $('clearMonth').onclick = () => {
       const prefix = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-`;
       if (!confirm(`確定要清空${person}這個月的所有班表嗎？`)) return;
-      Object.keys(data[person]).forEach((k) => { if (k.startsWith(prefix)) delete data[person][k]; });
-      persist();
+      const changes = {};
+      Object.keys(cal(person)).forEach((k) => { if (k.startsWith(prefix)) changes[k] = null; });
+      if (Object.keys(changes).length) setDays(person, changes);
       render();
     };
 
@@ -178,11 +169,7 @@ const Calendar = (() => {
     render();
   }
 
-  function reload() {
-    data = Store.load('calendar', {});
-    PEOPLE.forEach((p) => { if (!data[p]) data[p] = {}; });
-    render();
-  }
+  function reload() { render(); }
 
   return { init, reload };
 })();
