@@ -52,6 +52,22 @@
       btn.disabled = false; btn.textContent = '連線';
     }
   });
+  $('syncLinkConnect').addEventListener('click', async () => {
+    const text = $('syncLinkInput').value.trim();
+    if (!text) { toast('請先貼上設定連結'); return; }
+    const btn = $('syncLinkConnect');
+    btn.disabled = true; btn.textContent = '連線中…';
+    try {
+      await Store.connectWithLink(text);
+      $('syncLinkInput').value = '';
+      toast('☁️ 已連上雲端，資料同步完成');
+      openSync();
+    } catch (err) {
+      toast('⚠️ ' + err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = '用連結連線';
+    }
+  });
   $('syncNow').addEventListener('click', () => Store.sync());
   $('syncShare').addEventListener('click', async () => {
     const link = Store.shareLink();

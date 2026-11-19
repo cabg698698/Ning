@@ -257,14 +257,30 @@ const Store = (() => {
     return `${location.origin}${location.pathname}#sync=${encodeURIComponent(code)}`;
   }
 
+  // 解析設定連結（給「加到主畫面的 App」用：iPhone 的 App 和 Safari 資料是分開的）
+  function parseShareLink(text) {
+    const m = String(text || '').match(/sync=([^&\s]+)/);
+    if (!m) throw new Error('這不是 Ning 的設定連結');
+    const { k, r } = JSON.parse(atob(decodeURIComponent(m[1])));
+    if (!k) throw new Error('設定連結不完整');
+    return { token: k, repo: r };
+  }
+
+  async function connectWithLink(text) {
+    const { token, repo } = parseShareLink(text);
+    await connect(token, repo);
+  }
+
   async function consumeShareLink() {
     const m = location.hash.match(/sync=([^&]+)/);
     if (!m) return false;
     history.replaceState(null, '', location.pathname);
     try {
-      const { k, r } = JSON.parse(atob(decodeURIComponent(m[1])));
-      await connect(k, r);
-      toast('☁️ 已連上雲端，資料同步完成');
+      await connectWithLink(location.href.includes('sync=') ? location.href : '#sync=' + m[1]);
+      const isApp = navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+      toast(!isApp
+        ? '☁️ 網頁已連上。若有加到主畫面的 App，請在 App 裡貼上同一個連結'
+        : '☁️ 已連上雲端，資料同步完成');
     } catch (e) {
       toast('⚠️ 設定連結無效：' + e.message);
     }
@@ -302,7 +318,7 @@ const Store = (() => {
 
   return {
     get state() { return state; },
-    apply, onChange, onStatus, start, sync, connect, disconnect, shareLink, consumeShareLink,
+    apply, onChange, onStatus, start, sync, connect, disconnect, shareLink, consumeShareLink, connectWithLink,
     get syncConfig() { return syncCfg; },
     DEFAULT_REPO, prefs, setPrefs,
   };

@@ -119,6 +119,12 @@
     <div id="syncSetup">
       <h3>☁️ 雲端同步（存到你的 GitHub）</h3>
       <p class="muted">資料會存在你的<b>私人</b> GitHub repo 裡，手機、電腦、阿瓜的手機都看同一份。</p>
+      <div class="link-box">
+        <div class="form-label">🔗 有對方傳來的設定連結？</div>
+        <input id="syncLinkInput" type="text" placeholder="長按貼上設定連結" autocomplete="off" />
+        <button type="button" class="primary" id="syncLinkConnect">用連結連線</button>
+      </div>
+      <p class="or-line">或者自己輸入權杖</p>
       <label>GitHub 權杖（Token）<input id="syncToken" type="password" placeholder="github_pat_…" autocomplete="off" /></label>
       <label>資料 repo<input id="syncRepo" type="text" autocomplete="off" /></label>
       <p class="muted small-note">權杖只存在這台裝置。請用只開放「ning-data」一個 repo 的 fine-grained token。</p>
@@ -136,7 +142,7 @@
         <button type="button" class="chip" id="syncNow">🔄 立即同步</button>
         <button type="button" class="chip" id="syncShare">🔗 複製設定連結（給另一台裝置）</button>
       </div>
-      <p class="muted small-note">在另一台裝置（電腦、阿瓜的手機）打開設定連結，就會自動連上，不用再輸入權杖。連結裡有權杖，只傳給自己人喔。</p>
+      <p class="muted small-note">在另一台裝置打開設定連結就會自動連上。<b>加到主畫面的 App</b> 要在 App 裡點右上角「未同步」，把連結貼到「用連結連線」。連結裡有權杖，只傳給自己人喔。</p>
       <div class="dialog-actions">
         <button type="button" class="danger" id="syncOff">中斷同步</button>
         <span class="spacer"></span>
